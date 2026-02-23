@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>📈 Live Stock Prices</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            min-height: 100vh;
+            color: white;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            text-align: center;
+        }
+
+        h2 {
+            font-size: 2rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+            background: linear-gradient(90deg, #a78bfa, #60a5fa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle {
+            color: #94a3b8;
+            font-size: 0.9rem;
+            margin-bottom: 30px;
+        }
+
+        /* Search bar */
+        .search-wrapper {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 40px;
+        }
+
+        .search-wrapper input {
+            background: rgba(255, 255, 255, 0.07);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: white;
+            border-radius: 12px;
+            padding: 10px 18px;
+            width: 220px;
+            font-size: 0.95rem;
+            outline: none;
+            transition: border 0.2s;
+        }
+
+        .search-wrapper input::placeholder {
+            color: #94a3b8;
+        }
+
+        .search-wrapper input:focus {
+            border-color: #a78bfa;
+        }
+
+        .search-wrapper button {
+            background: linear-gradient(135deg, #a78bfa, #60a5fa);
+            border: none;
+            border-radius: 12px;
+            padding: 10px 22px;
+            color: white;
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: opacity 0.2s, transform 0.1s;
+        }
+
+        .search-wrapper button:hover {
+            opacity: 0.85;
+            transform: translateY(-1px);
+        }
+
+        /* Stock cards */
+        .stock-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 16px;
+        }
+
+        .stock-card {
+            width: 160px;
+            height: 170px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            text-align: center;
+            padding: 18px 12px;
+            backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .stock-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(167, 139, 250, 0.25);
+            border-color: rgba(167, 139, 250, 0.4);
+        }
+
+        .stock-symbol {
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            color: #e2e8f0;
+            margin-bottom: 8px;
+        }
+
+        .stock-price {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .price-up   { color: #34d399; }
+        .price-down { color: #f87171; }
+
+        .timestamp {
+            font-size: 11px;
+            color: #64748b;
+        }
+
+        /* Modal */
+        #chartModal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(4px);
+            z-index: 999;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #chartModal.open {
+            display: flex;
+        }
+
+        .modal-content {
+            background: #1e1b4b;
+            border: 1px solid rgba(167, 139, 250, 0.3);
+            border-radius: 20px;
+            padding: 30px;
+            width: 90%;
+            max-width: 640px;
+            text-align: center;
+        }
+
+        .modal-content h3 {
+            font-size: 1.4rem;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: #a78bfa;
+            letter-spacing: 2px;
+        }
+
+        .modal-content canvas {
+            max-height: 280px;
+        }
+
+        .modal-content button {
+            margin-top: 20px;
+            background: linear-gradient(135deg, #f87171, #ef4444);
+            border: none;
+            border-radius: 10px;
+            padding: 9px 24px;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .modal-content button:hover {
+            opacity: 0.85;
+        }
+    </style>
+
+    <script>
+        let stockPrices = {};
+        let priceHistory = {};
+        let chart;
+
+        function subscribeStock(symbol) {
+            symbol = symbol.trim().toUpperCase();
+            if (!symbol || document.getElementById(symbol)) return;
+
+            const eventSource = new EventSource(`/stocks/subscribe/${symbol}`);
+            const stockContainer = document.getElementById("stockContainer");
+
+            const card = document.createElement("div");
+            card.className = "stock-card";
+            card.id = symbol;
+            card.onclick = () => showGraph(symbol);
+            card.innerHTML = `
+                <div class="stock-symbol">${symbol}</div>
+                <div class="stock-price" id="price-${symbol}">--</div>
+                <div class="timestamp" id="time-${symbol}">waiting...</div>
+            `;
+            stockContainer.appendChild(card);
+            priceHistory[symbol] = [];
+
+            eventSource.onmessage = function(event) {
+                const stockData = JSON.parse(event.data);
+                const priceElement = document.getElementById(`price-${symbol}`);
+                const timeElement = document.getElementById(`time-${symbol}`);
+
+                const prevPrice = stockPrices[symbol] || stockData.price;
+                priceElement.className = stockData.price >= prevPrice
+                    ? "stock-price price-up"
+                    : "stock-price price-down";
+
+                priceElement.innerHTML = `$${stockData.price.toFixed(2)}`;
+                timeElement.innerHTML = new Date(stockData.timestamp).toLocaleTimeString();
+
+                stockPrices[symbol] = stockData.price;
+                priceHistory[symbol].push({ time: stockData.timestamp, price: stockData.price });
+
+                if (chart && document.getElementById("chartTitle").innerText === symbol) {
+                    updateChart(symbol);
+                }
+            };
+
+            eventSource.onerror = function() {
+                console.error(`Stream closed for ${symbol}`);
+                eventSource.close();
+            };
+        }
+
+        function showGraph(symbol) {
+            document.getElementById("chartTitle").innerText = symbol;
+            document.getElementById("chartModal").classList.add("open");
+            drawChart(symbol);
+        }
+
+        function drawChart(symbol) {
+            const ctx = document.getElementById("stockChart").getContext("2d");
+            if (chart) chart.destroy();
+
+            chart = new Chart(ctx, {
+                type: "line",
+                data: {
+                    labels: priceHistory[symbol].map(d => new Date(d.time).toLocaleTimeString()),
+                    datasets: [{
+                        label: `${symbol} Price`,
+                        data: priceHistory[symbol].map(d => d.price),
+                        borderColor: "#a78bfa",
+                        backgroundColor: "rgba(167, 139, 250, 0.15)",
+                        borderWidth: 2,
+                        pointRadius: 3,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: "#e2e8f0" } } },
+                    scales: {
+                        x: {
+                            ticks: { color: "#94a3b8" },
+                            grid: { color: "rgba(255,255,255,0.05)" },
+                            title: { display: true, text: "Time", color: "#94a3b8" }
+                        },
+                        y: {
+                            ticks: { color: "#94a3b8" },
+                            grid: { color: "rgba(255,255,255,0.05)" },
+                            title: { display: true, text: "Price (USD)", color: "#94a3b8" }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateChart(symbol) {
+            if (!chart) return;
+            chart.data.labels = priceHistory[symbol].map(d => new Date(d.time).toLocaleTimeString());
+            chart.data.datasets[0].data = priceHistory[symbol].map(d => d.price);
+            chart.update();
+        }
+
+        function closeModal() {
+            document.getElementById("chartModal").classList.remove("open");
+        }
+    </script>
+</head>
+
+<body>
+<div class="container">
+    <h2>📈 Live Stock Prices</h2>
+    <p class="subtitle">Real-time market data via gRPC streaming</p>
+
+    <div class="search-wrapper">
+        <input type="text" id="stockSymbol" placeholder="e.g. AAPL, TSLA"
+               onkeydown="if(event.key==='Enter') subscribeStock(this.value)">
+        <button onclick="subscribeStock(document.getElementById('stockSymbol').value)">
+            + Subscribe
+        </button>
+    </div>
+
+    <div class="stock-container" id="stockContainer"></div>
+</div>
+
+<!-- Chart Modal -->
+<div id="chartModal">
+    <div class="modal-content">
+        <h3 id="chartTitle"></h3>
+        <canvas id="stockChart"></canvas>
+        <button onclick="closeModal()">Close</button>
+    </div>
+</div>
+
+</body>
+</html>

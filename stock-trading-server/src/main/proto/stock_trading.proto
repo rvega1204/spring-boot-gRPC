@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "com.rvg.grpc";
+option java_outer_classname = "StockTradingProto";
+
+/**
+ * Stock Trading gRPC Service
+ * Provides stock price queries and trading operations through unary,
+ * server-streaming, client-streaming, and bidirectional streaming RPCs.
+ */
+service StockTradingService {
+  // Unary RPC: Get current price for a specific stock symbol
+  rpc GetStockPrice(StockRequest) returns (StockResponse);
+
+  // Server-streaming RPC: Subscribe to real-time stock price updates
+  rpc SubscribeStockPrice(StockRequest) returns (stream StockResponse);
+
+  // Client-streaming RPC: Process multiple bulk stock orders, return summary
+  rpc BulkStockOrder(stream StockOrder) returns (OrderSummary);
+
+  // Bidirectional streaming RPC: Live trading with per-order responses
+  rpc LiveTrading(stream StockOrder) returns (stream TradeStatus);
+}
+
+/**
+ * Request for stock symbol lookup
+ */
+message StockRequest {
+  string stock_symbol = 1;
+}
+
+/**
+ * Current stock price response
+ */
+message StockResponse {
+  string stock_symbol = 1;
+  double price = 2;
+  string timestamp = 3;  // ISO-8601 format
+}
+
+/**
+ * Individual stock order
+ */
+message StockOrder {
+  string order_id = 1;
+  string stock_symbol = 2;
+  int32 quantity = 3;
+  double price = 4;
+  string order_type = 5;  // "BUY" or "SELL"
+}
+
+/**
+ * Summary of bulk order processing
+ */
+message OrderSummary {
+  int32 total_orders = 1;
+  double total_amount = 2;
+  int32 success_count = 3;
+}
+
+/**
+ * Status response for individual trade execution
+ */
+message TradeStatus {
+  string order_id = 1;
+  string status = 2;      // "PENDING", "EXECUTED", "FAILED"
+  string message = 3;     // Human-readable status details
+  string timestamp = 4;   // ISO-8601 format
+}

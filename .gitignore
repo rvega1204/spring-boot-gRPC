@@ -1,0 +1,43 @@
+# Maven
+target/
+*.jar
+*.war
+*.ear
+
+# Integrated Development Environments (IDEs)
+# VS Code
+.vscode/
+*.code-workspace
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Eclipse
+.settings/
+.project
+.classpath
+.factorypath
+.springBeans
+
+# NetBeans
+nbproject/
+nb-configuration.xml
+nbactions.xml
+
+# System Files
+.DS_Store
+Thumbs.db
+*.tmp
+*.bak
+*.swp
+
+# Log files
+*.log
+
+# Project specific
+/stock-trading-client/target/
+/stock-trading-server/target/
